@@ -1,13 +1,26 @@
 'use strict';
+import {
+    updateAudioInfo,
+    wrapAudioInfo,
+    toggleInfoActive,
+    toggleTextPlayed
+} from './audio-info.js';
+
+import {
+    debounce
+} from './debounce.js';
+
 var audio = document.getElementById('audio');
 var btnPlay = document.querySelector('.player-btn');
 var audioList = {};
+var CLICK_INTERVAL = 500;
 
 class CurrentRaggas {
     constructor() {
         this.time = undefined,
             this.playList = [],
             this.currentTrackIndex = 0,
+            this.currentTrack = undefined,
             this.isTouched = false
     }
 
@@ -18,6 +31,9 @@ class CurrentRaggas {
         } else {
             this.currentTrackIndex++;
         }
+
+        this.currentTrack = this.playList[currentTrack];
+
         return this.playList[currentTrack];
     }
 
@@ -43,6 +59,7 @@ function fetchAudioList() {
 
 function getAudioTrack() {
     var track = currentRaggas.getNextTrack();
+    console.log('Get New Track: ', track)
     return AUDIO_SRC + currentRaggas.time + '/' + track;
 }
 
@@ -52,7 +69,6 @@ function setExpirationTime(timeEnd) {
     var expirationTime = endDate.getTime() - currentDate.getTime();
     console.log('Expiration Time(ms): ', expirationTime);
     var timeOut = setTimeout(() => {
-        console.log('Im in TimeOut!!!');
         clearTimeout(timeOut);
         currentRaggas = new CurrentRaggas();
         currentRaggas.playList = getPlayList(new Date());
@@ -73,7 +89,12 @@ function getPlayList(date) {
 };
 
 function playRaggas() {
-    if (!currentRaggas.isTouched) audio.src = getAudioTrack();
+    if (!currentRaggas.isTouched) {
+        audio.src = getAudioTrack();
+        wrapAudioInfo(currentRaggas.currentTrack);
+    } else {
+        toggleInfoActive('PLAY');
+    };
     audio.play();
     currentRaggas.touched();
 }
@@ -83,9 +104,14 @@ var onBtnClick = (evt) => {
 
     btnPlay.classList.toggle('player-btn--played');
 
-    btnPlay.classList.contains('player-btn--played') ?
-        playRaggas() :
-        audio.pause()
+    if (btnPlay.classList.contains('player-btn--played')) {
+        playRaggas();
+    } else {
+        audio.pause();
+        toggleInfoActive('PAUSE');
+    }
+
+    toggleTextPlayed();
 };
 
 var onAudioEnded = () => {
@@ -94,7 +120,18 @@ var onAudioEnded = () => {
 };
 
 export function play() {
-    btnPlay.addEventListener('click', onBtnClick);
-    audio.addEventListener('ended', onAudioEnded)
+    btnPlay.addEventListener('click', debounce(onBtnClick, CLICK_INTERVAL));
+    audio.addEventListener('ended', onAudioEnded);
+    audio.addEventListener('timeupdate', () => {
+        updateAudioInfo(audio.currentTime, audio.duration);
+    });
     fetchAudioList();
+};
+
+export function toggleVolume() {
+    if (audio.volume) {
+        audio.volume = 0;
+    } else {
+        audio.volume = 1;
+    }
 };
